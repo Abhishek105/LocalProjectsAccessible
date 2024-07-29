@@ -1,0 +1,190 @@
+Creating a Recipe Recommendation System in Python involves several steps, including data collection, preprocessing, model building, and deployment. Here’s a comprehensive guide to building a Recipe Recommendation System.
+
+### Step 1: Setting Up the Environment
+
+1. **Install Required Libraries:**
+   ```bash
+   pip install pandas numpy scikit-learn flask sqlalchemy
+   ```
+
+2. **Set Up the Project Structure:**
+   ```plaintext
+   recipe_recommendation_system/
+   ├── app.py
+   ├── data/
+   │   └── recipes.csv
+   ├── models/
+   │   └── recommendation_model.pkl
+   ├── static/
+   │   └── style.css
+   ├── templates/
+   │   └── index.html
+   └── utils.py
+   ```
+
+### Step 2: Data Collection
+
+Use a dataset of recipes. For simplicity, let's assume we have a CSV file named `recipes.csv` with columns like `recipe_id`, `title`, `ingredients`, and `instructions`.
+
+### Step 3: Data Preprocessing
+
+Create a utility script `utils.py` for data preprocessing and model training.
+
+```python
+# utils.py
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import linear_kernel
+import pickle
+
+def load_data(file_path):
+    return pd.read_csv(file_path)
+
+def preprocess_data(df):
+    df['ingredients'] = df['ingredients'].apply(lambda x: x.lower())
+    return df
+
+def train_model(df):
+    tfidf = TfidfVectorizer(stop_words='english')
+    tfidf_matrix = tfidf.fit_transform(df['ingredients'])
+    cosine_sim = linear_kernel(tfidf_matrix, tfidf_matrix)
+    return cosine_sim
+
+def save_model(model, file_path):
+    with open(file_path, 'wb') as file:
+        pickle.dump(model, file)
+
+def load_model(file_path):
+    with open(file_path, 'rb') as file:
+        return pickle.load(file)
+
+def get_recommendations(title, df, cosine_sim):
+    indices = pd.Series(df.index, index=df['title']).drop_duplicates()
+    idx = indices[title]
+    sim_scores = list(enumerate(cosine_sim[idx]))
+    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+    sim_scores = sim_scores[1:6]
+    recipe_indices = [i[0] for i in sim_scores]
+    return df['title'].iloc[recipe_indices]
+```
+
+### Step 4: Model Training
+
+Use the utility functions to preprocess the data and train the model.
+
+```python
+# Train the model
+import utils
+
+# Load and preprocess data
+data_path = 'data/recipes.csv'
+df = utils.load_data(data_path)
+df = utils.preprocess_data(df)
+
+# Train and save the model
+cosine_sim = utils.train_model(df)
+model_path = 'models/recommendation_model.pkl'
+utils.save_model(cosine_sim, model_path)
+```
+
+### Step 5: Building the Web Application
+
+1. **Create the Flask App:**
+
+```python
+# app.py
+from flask import Flask, request, render_template
+import utils
+
+app = Flask(__name__)
+
+# Load data and model
+data_path = 'data/recipes.csv'
+df = utils.load_data(data_path)
+df = utils.preprocess_data(df)
+model_path = 'models/recommendation_model.pkl'
+cosine_sim = utils.load_model(model_path)
+
+@app.route('/')
+def home():
+    return render_template('index.html')
+
+@app.route('/recommend', methods=['POST'])
+def recommend():
+    recipe_title = request.form['title']
+    recommendations = utils.get_recommendations(recipe_title, df, cosine_sim)
+    return render_template('index.html', recommendations=recommendations)
+
+if __name__ == '__main__':
+    app.run(debug=True)
+```
+
+2. **Create the HTML Template:**
+
+```html
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Recommendation System</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>Recipe Recommendation System</h1>
+    <form action="/recommend" method="post">
+        <label for="title">Enter Recipe Title:</label>
+        <input type="text" id="title" name="title" required>
+        <button type="submit">Get Recommendations</button>
+    </form>
+
+    {% if recommendations %}
+    <h2>Recommended Recipes:</h2>
+    <ul>
+        {% for recipe in recommendations %}
+        <li>{{ recipe }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+</body>
+</html>
+```
+
+3. **Add Some CSS:**
+
+```css
+/* static/style.css */
+body {
+    font-family: Arial, sans-serif;
+    margin: 50px;
+    text-align: center;
+}
+
+form {
+    margin-bottom: 20px;
+}
+
+input {
+    padding: 10px;
+    margin: 10px;
+}
+
+button {
+    padding: 10px;
+}
+```
+
+### Step 6: Running the Application
+
+Run the Flask app:
+
+```bash
+python app.py
+```
+
+Open your browser and navigate to `http://127.0.0.1:5000` to see the Recipe Recommendation System in action.
+
+### Conclusion
+
+This guide provides a comprehensive overview of creating a Recipe Recommendation System using Python and Flask. You can enhance the system by incorporating more sophisticated recommendation algorithms, improving the user interface, and adding features like user authentication and saving favorite recipes.
